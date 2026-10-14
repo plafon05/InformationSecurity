@@ -6,7 +6,6 @@ import (
 	"access-control/internal/securefile"
 	"access-control/internal/web"
 	"bufio"
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -132,25 +131,6 @@ func readPhrase(path string) (string, error) {
 
 func readSecret(prompt string) (string, error) {
 	fmt.Print(prompt)
-	if runtime.GOOS != "windows" {
-		getState := exec.Command("stty", "-g")
-		getState.Stdin = os.Stdin
-		state, err := getState.Output()
-		if err != nil {
-			return "", err
-		}
-		setNoEcho := exec.Command("stty", "-echo", "-isig")
-		setNoEcho.Stdin = os.Stdin
-		if err = setNoEcho.Run(); err != nil {
-			return "", err
-		}
-		defer func() {
-			restore := exec.Command("stty", string(bytes.TrimSpace(state)))
-			restore.Stdin = os.Stdin
-			_ = restore.Run()
-			fmt.Println()
-		}()
-	}
 	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if strings.ContainsRune(line, '\x03') {
 		return "", fmt.Errorf("Ввод парольной фразы отменён")
