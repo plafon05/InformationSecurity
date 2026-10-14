@@ -82,7 +82,9 @@ func Open(path, phrase string, legacyPaths ...string) (*Session, error) {
 		}
 	}
 	if validEncrypted {
-		if len(plainBytes) != 0 && validAccounts(plainBytes) {
+		workingFileValid := len(plainBytes) != 0 && validAccounts(plainBytes)
+		writeWorkingFile := !workingFileValid
+		if workingFileValid {
 			recovered = plainBytes
 		}
 		orphanPath, orphanData := newestValidWorkingTemp(dir)
@@ -91,10 +93,13 @@ func Open(path, phrase string, legacyPaths ...string) (*Session, error) {
 			orphanInfo, _ := os.Stat(orphanPath)
 			if workingInfo == nil || (orphanInfo != nil && orphanInfo.ModTime().After(workingInfo.ModTime())) {
 				recovered = orphanData
+				writeWorkingFile = true
 			}
 		}
-		if err := writeRestricted(s.workingPath, recovered); err != nil {
-			return nil, err
+		if writeWorkingFile {
+			if err := writeRestricted(s.workingPath, recovered); err != nil {
+				return nil, err
+			}
 		}
 		if err := removeWorkingTemps(dir); err != nil {
 			return nil, fmt.Errorf("не удалось очистить незавершённый временный файл: %w", err)
