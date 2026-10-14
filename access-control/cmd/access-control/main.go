@@ -2,7 +2,7 @@ package main
 
 import (
 	"access-control/internal/accounts"
-	"access-control/internal/postgres"
+	"access-control/internal/filestore"
 	"access-control/internal/web"
 	"context"
 	"flag"
@@ -25,17 +25,14 @@ func main() {
 	if *port < 1 || *port > 65535 {
 		log.Fatal("Порт должен быть числом от 1 до 65535.")
 	}
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		log.Fatal("Задайте DATABASE_URL. Для локального запуска используйте scripts/start.sh.")
+	dataFile := os.Getenv("ACCESS_CONTROL_DATA_FILE")
+	if dataFile == "" {
+		dataFile = "data/users.json"
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	repository, err := postgres.Open(ctx, databaseURL)
-	cancel()
+	repository, err := filestore.Open(dataFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer repository.Close()
 	store := accounts.New(repository)
 	address := fmt.Sprintf("127.0.0.1:%d", *port)
 	listener, err := net.Listen("tcp", address)
@@ -65,7 +62,7 @@ func main() {
 		}
 	}()
 	url := "http://" + listener.Addr().String()
-	fmt.Printf("Разграничение доступа: %s\nХранилище: PostgreSQL\n", url)
+	fmt.Printf("Разграничение доступа: %s\nХранилище: %s\n", url, dataFile)
 	if !*noBrowser {
 		var cmd *exec.Cmd
 		switch runtime.GOOS {

@@ -112,6 +112,11 @@ func (s *Server) api(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	end := func() { s.ended = true; go s.stop() }
+		if q.Action == "exit" {
+			end()
+			reply(200, map[string]any{"ended": true})
+			return
+		}
 	passwordFailure := func(err error) {
 		if errors.Is(err, accounts.ErrPassword) {
 			s.failures++

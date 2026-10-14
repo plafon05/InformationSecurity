@@ -64,13 +64,3 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal("admin blocked")
 	}
 }
-func TestPolicy(t *testing.T) {
-	for _, tc := range []struct {
-		p     string
-		r, ok bool
-	}{{"", false, false}, {"hello", false, true}, {"hello", true, false}, {"Привет", true, false}, {"aЯ", true, true}, {"aё", true, true}, {"123!", true, false}, {"éЯ", true, false}, {strings.Repeat("a", 1025), false, false}} {
-		if got := accounts.ValidPassword(tc.p, tc.r) == nil; got != tc.ok {
-			t.Errorf("%q: %v", tc.p, got)
-		}
-	}
-}

@@ -90,44 +90,24 @@ func TestThreeIncorrectPasswords(t *testing.T) {
 		t.Fatal("continued after termination")
 	}
 }
-func TestLogoutKeepsProgramRunning(t *testing.T) {
-	c, _, stopped := newClient(t)
-	if w := c.call(request{Action: "logout"}); w.Code != 401 {
-		t.Fatal("anonymous logout", w.Code)
-	}
-	if w := c.call(request{Action: "login", Name: "ADMIN"}); w.Code != 200 {
-		t.Fatal(w.Body.String())
-	}
-	oldCookie := c.cookie
-	w := c.call(request{Action: "logout"})
-	if w.Code != 200 || len(w.Result().Cookies()) != 1 {
-		t.Fatal("logout failed", w.Code, w.Body.String())
-	}
-	select {
-	case <-stopped:
-		t.Fatal("logout stopped the program")
-	default:
-	}
-	if w := c.call(request{Action: "state"}); w.Code != 403 {
-		t.Fatal("old session remained valid", w.Code)
-	}
-	c.cookie = w.Result().Cookies()[0]
-	if c.cookie.Value == oldCookie.Value {
-		t.Fatal("session token not rotated")
-	}
-	if w := c.call(request{Action: "state"}); w.Code != 200 || !bytes.Contains(w.Body.Bytes(), []byte(`"user":null`)) {
-		t.Fatal("new session is not anonymous", w.Code, w.Body.String())
-	}
-	if w := c.call(request{Action: "login", Name: "ADMIN"}); w.Code != 200 {
-		t.Fatal("cannot log in again", w.Code, w.Body.String())
-	}
-	if w := c.call(request{Action: "password", Password: "new-secret", Confirmation: "new-secret"}); w.Code != 200 {
-		t.Fatal("cannot set first password after logout", w.Code, w.Body.String())
-	}
-	w = c.call(request{Action: "logout"})
-	c.cookie = w.Result().Cookies()[0]
-	if w := c.call(request{Action: "login", Name: "ADMIN", Password: "new-secret"}); w.Code != 200 || bytes.Contains(w.Body.Bytes(), []byte(`"initial":true`)) {
-		t.Fatal("password lost after logout", w.Code, w.Body.String())
+func TestExitBeforeAndAfterLogin(t *testing.T) {
+	for _, login := range []bool{false, true} {
+		c, _, stopped := newClient(t)
+		if login {
+			c.call(request{Action: "login", Name: "ADMIN"})
+		}
+		w := c.call(request{Action: "exit"})
+		if w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		select {
+		case <-stopped:
+		case <-time.After(time.Second):
+			t.Fatal("exit did not stop program")
+		}
+		if w := c.call(request{Action: "state"}); w.Code != 410 {
+			t.Fatal("program still accepts requests", w.Code)
+		}
 	}
 }
 func TestRequestProtection(t *testing.T) {

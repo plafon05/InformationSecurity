@@ -10,7 +10,7 @@ async function api(action, values = {}) {
 }
 function message(error) { return error instanceof TypeError ? 'Нет связи с приложением. Проверьте, что программа запущена.' : error.message; }
 function toast(text) {clearTimeout(toastTimer);$('#toast').textContent=text;$('#toast').hidden=false;toastTimer=setTimeout(()=>$('#toast').hidden=true,3500);}
-function endScreen(text) {user=null;$('#login-form').reset();resetPasswords($('#login-form'));$('#users').replaceChildren();clearPasswordView();if($('#modal').open)$('#modal').close();$('#login').hidden=true;$('#workspace').hidden=true;$('#ended').hidden=false;if(text)$('#end-message').textContent=text;document.querySelectorAll('nav button').forEach(b=>b.disabled=true);}
+function endScreen(text) {user=null;$('#login-form').reset();resetPasswords($('#login-form'));$('#users').replaceChildren();clearPasswordView();if($('#modal').open)$('#modal').close();if($('#password-modal').open)$('#password-modal').close();$('#login').hidden=true;$('#workspace').hidden=true;$('#ended').hidden=false;if(text)$('#end-message').textContent=text;document.querySelectorAll('nav button').forEach(b=>b.disabled=true);}
 async function logout() {
   try {
     await api('logout');
@@ -184,7 +184,7 @@ function openDialog(title,description,fields,action,submitText='Сохранит
 }
 function clearPasswordView() {
   requiredPassword = false;
-  $('#password-view').hidden = true;
+  if ($('#password-modal').open) $('#password-modal').close();
   $('#password-form').reset();
   $('#password-fields').replaceChildren();
   $('#password-form .error').textContent = '';
@@ -198,11 +198,11 @@ function showPasswordScreen(initial=false) {
   $('#password-description').textContent=`${initial?'Перед началом работы задайте непустой пароль. ':'Подтвердите текущий пароль и задайте новый. '}${user.restricted?'Обязательны латинская и кириллическая буквы.':'Ограничение по алфавитам отключено.'}`;
   $('#password-fields').replaceChildren(...fields);
   $('#password-form .error').textContent='';
-  $('#cancel-password').textContent=initial?'Выйти из профиля':'Отмена';
+  $('#cancel-password').textContent=initial?'Завершить программу':'Отмена';
   $('#submit-password').textContent=initial?'Установить пароль':'Изменить пароль';
   enhancePasswords($('#password-fields'));
   $('#workspace').hidden=true;
-  $('#password-view').hidden=false;
+  if (!$('#password-modal').open) $('#password-modal').showModal();
   document.querySelectorAll('.needs-user').forEach(b=>b.disabled=true);
   document.querySelectorAll('.admin-only').forEach(el=>el.hidden=true);
   $('#password-fields input').focus();
@@ -274,11 +274,14 @@ async function render(){
 $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const button=$('#login-form button[type=submit]');button.disabled=true;$('#login-form .error').textContent='';try{const values=Object.fromEntries(new FormData(event.currentTarget));const data=await api('login',values);event.target.reset();resetPasswords(event.target);user=data.user;await render();}catch(e){$('#login-form .error').textContent=message(e);}finally{button.disabled=false;}});
 $('#dialog-form').addEventListener('submit',async event=>{event.preventDefault();if(!submitAction)return;const button=$('#submit-modal');button.disabled=true;$('#dialog-form .error').textContent='';try{await submitAction(Object.fromEntries(new FormData(event.currentTarget)));}catch(e){$('#dialog-form .error').textContent=message(e);}finally{button.disabled=false;}});
 $('#password-form').addEventListener('submit',async event=>{event.preventDefault();const button=$('#submit-password');if(button.disabled)return;button.disabled=true;$('#cancel-password').disabled=true;$('#password-form .error').textContent='';try{const values=Object.fromEntries(new FormData(event.currentTarget));const data=await api('password',{old:'',...values});user=data.user;clearPasswordView();await render();toast('Пароль сохранён.');}catch(e){$('#password-form .error').textContent=message(e);}finally{button.disabled=false;$('#cancel-password').disabled=false;}});
-$('#cancel-password').addEventListener('click',async()=>{if(requiredPassword){await logout();return;}clearPasswordView();await render();});
+$('#cancel-password').addEventListener('click',async()=>{if(requiredPassword){await exitProgram();return;}clearPasswordView();await render();});
+async function exitProgram(){try{await api('exit');endScreen();}catch(e){toast(message(e));}}
+$('#exit-login').addEventListener('click',exitProgram);
+$('#password-modal').addEventListener('cancel',event=>{if(requiredPassword){event.preventDefault();exitProgram();}});
 function cancelDialog(){$('#modal').close();}
 $('#cancel-modal').addEventListener('click',cancelDialog);$('#close-modal').addEventListener('click',cancelDialog);
 $('#modal').addEventListener('close',()=>{$('#dialog-fields').replaceChildren();submitAction=null;});
-document.querySelectorAll('[data-command]').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('details').forEach(el=>el.open=false);try{switch(button.dataset.command){case 'about':about();break;case 'logout':await logout();break;case 'password':showPasswordScreen();break;case 'add':addDialog();break;case 'export':exportDialog();break;}}catch(e){$('#page-error').textContent=message(e);}}));
+document.querySelectorAll('[data-command]').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('details').forEach(el=>el.open=false);try{switch(button.dataset.command){case 'about':about();break;case 'logout':await logout();break;case 'exit':await exitProgram();break;case 'password':showPasswordScreen();break;case 'add':addDialog();break;case 'export':exportDialog();break;}}catch(e){$('#page-error').textContent=message(e);}}));
 enhancePasswords(document);
 setupMenus();
 api('state').then(async data=>{user=data.user;await render();}).catch(e=>{$('#login-form .error').textContent=message(e);});

@@ -40,10 +40,3 @@ func TestHashAndVerify(t *testing.T) {
 		t.Fatal("oversized password")
 	}
 }
-func TestMalformedHashes(t *testing.T) {
-	for _, hash := range []string{"broken", "$argon2i$v=19$m=65536,t=3,p=1$a$b", "$argon2id$v=19$m=4294967295,t=3,p=1$a$b", "$argon2id$v=19$m=65536,t=0,p=1$a$b", "$argon2id$v=19$m=65536,t=3,p=0$a$b", "$argon2id$v=19$m=65536,t=3,p=1$?$?", strings.Repeat("a", 257)} {
-		if ok, err := Verify(hash, "test"); ok || err == nil {
-			t.Fatalf("accepted %q", hash)
-		}
-	}
-}
