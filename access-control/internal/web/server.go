@@ -22,17 +22,21 @@ type Server struct {
 	mu                sync.Mutex
 	store             *accounts.Store
 	token, user, host string
+	rekey             func(string, string) error
 	failures          int
 	ended             bool
 	stop              func()
 }
 
-func New(store *accounts.Store, host string, stop func()) http.Handler {
+func New(store *accounts.Store, host string, stop func(), rekey ...func(string, string) error) http.Handler {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
 	s := &Server{store: store, host: host, token: hex.EncodeToString(b), stop: stop}
+	if len(rekey) != 0 {
+		s.rekey = rekey[0]
+	}
 	static, _ := fs.Sub(assets, "ui")
 	files := http.FileServer(http.FS(static))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,6 +73,8 @@ type request struct {
 	Password     string `json:"password"`
 	Old          string `json:"old"`
 	Confirmation string `json:"confirmation"`
+	OldPhrase    string `json:"oldPhrase"`
+	NewPhrase    string `json:"newPhrase"`
 	Blocked      bool   `json:"blocked"`
 	Restricted   bool   `json:"restricted"`
 }
@@ -112,11 +118,11 @@ func (s *Server) api(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	end := func() { s.ended = true; go s.stop() }
-		if q.Action == "exit" {
-			end()
-			reply(200, map[string]any{"ended": true})
-			return
-		}
+	if q.Action == "exit" {
+		end()
+		reply(200, map[string]any{"ended": true})
+		return
+	}
 	passwordFailure := func(err error) {
 		if errors.Is(err, accounts.ErrPassword) {
 			s.failures++
@@ -200,6 +206,21 @@ func (s *Server) api(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch q.Action {
+	case "rekey":
+		if q.NewPhrase == "" || q.NewPhrase != q.Confirmation {
+			fail(errors.New("Новая парольная фраза не введена или подтверждение не совпадает."))
+			return
+		}
+		if s.rekey == nil {
+			fail(accounts.ErrStorage)
+			return
+		}
+		if err := s.rekey(q.OldPhrase, q.NewPhrase); err != nil {
+			fail(err)
+			return
+		}
+		reply(200, map[string]bool{"ok": true})
+		return
 	case "export":
 		if q.Format != "json" && q.Format != "csv" && q.Format != "xml" {
 			fail(errors.New("Выберите формат JSON, CSV или XML."))

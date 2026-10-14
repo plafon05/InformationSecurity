@@ -250,6 +250,7 @@ function exportDialog() {
     toast('Файл подготовлен к скачиванию.');
   }, 'Скачать файл');
 }
+function rekeyDialog(){openDialog('Смена парольной фразы','Введите текущую фразу, затем новую и её подтверждение.',[field('Текущая парольная фраза','oldPhrase','password','current-password'),field('Новая парольная фраза','newPhrase'),field('Повторите новую фразу','confirmation')],async values=>{await api('rekey',values);$('#modal').close();toast('Парольная фраза изменена. Используйте её при следующем запуске.');},'Изменить фразу');}
 function addDialog() {openDialog('Новый пользователь','Создайте уникальное имя. Пользователь установит пароль при первом входе.',[field('Имя пользователя','name','text','off')],async values=>{await api('add',values);$('#modal').close();await loadUsers();toast('Пользователь добавлен с пустым паролем.');},'Добавить');}
 function checkbox(text,name,checked,disabled=false) {const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.name=name;input.checked=checked;input.disabled=disabled;label.append(input,document.createTextNode(text));return label;}
 function editDialog(account) {openDialog(`Доступ: ${account.name}`,'Ограничение проверяется при установке и смене пароля.',[checkbox('Заблокировать учётную запись','blocked',account.blocked,account.name==='ADMIN'),checkbox('Требовать латинские и кириллические буквы','restricted',account.restricted)],async()=>{
@@ -257,7 +258,7 @@ function editDialog(account) {openDialog(`Доступ: ${account.name}`,'Огр
   if(account.name===user.name)user=(await api('state')).user;
   $('#modal').close();await render();toast('Параметры доступа сохранены.');
 });}
-function about(){openDialog('О программе','Контур · Разграничение полномочий пользователей',[],null);const p=document.createElement('p');p.className='about-copy';p.textContent='Автор: Желтов Данила, группа ИДБ-23-11.\n\nИндивидуальное задание: разработка программы разграничения полномочий пользователей на основе парольной аутентификации.\n\nОграничение на пароль: наличие латинских букв и символов кириллицы. Проверяется наличие хотя бы одной буквы A–Z или a–z и одной кириллической буквы.\n\nРежимы работы: администратор ADMIN и обычный пользователь. Реализация: Go, локальный веб-интерфейс.';$('#dialog-fields').append(p);}
+function about(){openDialog('О программе','Контур · Разграничение полномочий пользователей',[],null);const p=document.createElement('p');p.className='about-copy';p.textContent='Автор: Желтов Данила, группа ИДБ-23-11.\n\nИндивидуальное задание: защита файла учётных данных. Используются потоковый шифр RC4 и хеш-функция MD2 для получения ключа без соли; временный файл восстанавливается после аварийного завершения.\n\nОграничение на пароль: наличие латинских букв и символов кириллицы. Проверяется наличие хотя бы одной буквы A–Z или a–z и одной кириллической буквы.\n\nРежимы работы: администратор ADMIN и обычный пользователь. Реализация: Go, локальный веб-интерфейс.';$('#dialog-fields').append(p);}
 async function loadUsers(){const data=await api('list');const users=data.users;$('#count').textContent=`Всего: ${users.length}`;$('#users').replaceChildren(...users.map(account=>{
  const row=document.createElement('tr');const cell=(text)=>{const td=document.createElement('td');td.textContent=text;row.append(td);return td;};cell(account.name);
  const status=cell('');const badge=document.createElement('span');badge.className=`badge ${account.blocked?'red':'green'}`;badge.textContent=account.blocked?'Заблокирован':'Разрешён';status.append(badge);
@@ -281,7 +282,7 @@ $('#password-modal').addEventListener('cancel',event=>{if(requiredPassword){even
 function cancelDialog(){$('#modal').close();}
 $('#cancel-modal').addEventListener('click',cancelDialog);$('#close-modal').addEventListener('click',cancelDialog);
 $('#modal').addEventListener('close',()=>{$('#dialog-fields').replaceChildren();submitAction=null;});
-document.querySelectorAll('[data-command]').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('details').forEach(el=>el.open=false);try{switch(button.dataset.command){case 'about':about();break;case 'logout':await logout();break;case 'exit':await exitProgram();break;case 'password':showPasswordScreen();break;case 'add':addDialog();break;case 'export':exportDialog();break;}}catch(e){$('#page-error').textContent=message(e);}}));
+document.querySelectorAll('[data-command]').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('details').forEach(el=>el.open=false);try{switch(button.dataset.command){case 'about':about();break;case 'logout':await logout();break;case 'exit':await exitProgram();break;case 'password':showPasswordScreen();break;case 'add':addDialog();break;case 'export':exportDialog();break;case 'rekey':rekeyDialog();break;}}catch(e){$('#page-error').textContent=message(e);}}));
 enhancePasswords(document);
 setupMenus();
 api('state').then(async data=>{user=data.user;await render();}).catch(e=>{$('#login-form .error').textContent=message(e);});
